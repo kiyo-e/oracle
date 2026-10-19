@@ -15,10 +15,13 @@ export function buildAttachmentEvidenceExpression(
     (names[0] ?? "").split(/[\\/]/).pop()?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
   const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const extensionIndex = basename.lastIndexOf(".");
+  // Provider collision renames insert a numeric suffix before the extension, or at
+  // the end for extensionless and dotfile names (Dockerfile(1), .env(1)).
+  const collisionSuffix = "(?:\\s*\\([0-9]+(?:-[0-9]+)*\\))?";
   const japaneseName =
     extensionIndex > 0 && extensionIndex < basename.length - 1
-      ? `${escape(basename.slice(0, extensionIndex))}(?:\\s*\\([0-9]+(?:-[0-9]+)*\\))?${escape(basename.slice(extensionIndex))}`
-      : escape(basename);
+      ? `${escape(basename.slice(0, extensionIndex))}${collisionSuffix}${escape(basename.slice(extensionIndex))}`
+      : `${escape(basename)}${collisionSuffix}`;
   const japaneseLabelPattern = basename ? `^${japaneseName} を削除$` : null;
   return `(() => {
     const names = ${JSON.stringify(names)}.map(name => String(name).toLowerCase().replace(/\\s+/g, ' ').trim());
@@ -33,9 +36,21 @@ export function buildAttachmentEvidenceExpression(
     const sendSelectors = ${JSON.stringify(SEND_BUTTON_SELECTORS)};
     const prompt = ${JSON.stringify(INPUT_SELECTORS)}.flatMap(selector => Array.from(document.querySelectorAll(selector))).find(visible);
     if (!prompt) return action === 'read' ? empty : false;
+    // Attachment cards can sit outside the inner form as siblings under the
+    // unified-composer wrapper, so prefer the nearest usable composer wrapper
+    // (never footer/action/plus/send sub-wrappers or buttons) before the form.
+    const usableComposerRoot = node => {
+      if (!(node instanceof HTMLElement) || String(node.tagName || '').toLowerCase() === 'button') return false;
+      const testId = String(node.getAttribute('data-testid') || '').toLowerCase();
+      return testId.includes('composer') && !/footer|action|plus|send/.test(testId);
+    };
+    let composer = null;
+    for (let node = prompt.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+      if (usableComposerRoot(node)) { composer = node; break; }
+    }
     // Empty composers show voice controls instead of send; anchor receipts to
     // the explicit root so mounting attachment UI cannot change their scope.
-    let composer = prompt.closest('form,[data-testid="composer"]');
+    composer ??= prompt.closest('form,[data-testid="composer"]');
     let fallback = null;
     for (let node = prompt.parentElement; !composer && node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
       if (!sendSelectors.some(selector => node.querySelector(selector))) continue;
