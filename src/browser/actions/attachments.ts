@@ -1438,14 +1438,26 @@ export async function clearComposerAttachments(
       '[aria-label*="remove file"]',
       '[data-testid*="remove-attachment"]',
       '[data-testid*="attachment-remove"]',
+      'button[aria-label$=" を削除"]',
     ];
     const visible = (el) => {
       if (!(el instanceof HTMLElement)) return false;
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
     };
+    // Current Japanese cards have no test ID. Accept their removal button only
+    // with the same card scoping the receipt scanner uses, so unrelated
+    // "... を削除" controls (history, drafts) are never clicked.
+    const isRemoveControl = (el) => {
+      if (!el.matches('button[aria-label$=" を削除"]')) return true;
+      const label = el.getAttribute('aria-label') ?? '';
+      return (
+        /^.+ を削除$/.test(label) &&
+        Boolean(el.closest('[class~="group/composer-attachment"]') && el.closest('[data-composer-attachments]'))
+      );
+    };
     const removeButtons = scope
-      ? Array.from(scope.querySelectorAll(removeSelectors.join(','))).filter(visible)
+      ? Array.from(scope.querySelectorAll(removeSelectors.join(','))).filter(visible).filter(isRemoveControl)
       : [];
     for (const button of removeButtons.slice(0, 20)) {
       try {
