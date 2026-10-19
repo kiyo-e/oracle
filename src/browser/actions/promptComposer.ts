@@ -905,6 +905,7 @@ async function activateExactAttachmentSendButton(
   const exactSendSelectors = [
     'button[data-testid="send-button"]',
     'form button[type="submit"][aria-label="Send"]',
+    'form button[type="submit"][aria-label="送信"]',
   ];
   const probe = await Runtime.evaluate({
     expression: `(() => {
