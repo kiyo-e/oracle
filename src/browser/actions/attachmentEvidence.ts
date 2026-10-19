@@ -75,10 +75,13 @@ export function buildAttachmentEvidenceExpression(
     const currentControls = controls();
     // Provider collision renames may change this same Japanese removal button
     // in place. Both labels must remain strict aliases of the assigned filename.
+    // The pattern is built from the whitespace-normalized basename, so normalize
+    // labels the same way before testing; legacy exact equality stays verbatim.
+    const normalize = value => String(value ?? '').toLowerCase().replace(/\\s+/g, ' ').trim();
     const valid = receipt => {
       if (receipt.composer !== composer || !receipt.control?.isConnected || !currentControls.includes(receipt.control)) return false;
       const label = receipt.control.getAttribute('aria-label');
-      return label === receipt.label || Boolean(receipt.japaneseLabelPattern && receipt.japaneseLabelPattern.test(receipt.label) && receipt.japaneseLabelPattern.test(label));
+      return label === receipt.label || Boolean(receipt.japaneseLabelPattern && receipt.japaneseLabelPattern.test(normalize(receipt.label)) && receipt.japaneseLabelPattern.test(normalize(label)));
     };
     for (const [receiptId, receipt] of receipts) {
       if (receipt.composer !== composer || (receipt.control && !valid(receipt))) receipts.delete(receiptId);
